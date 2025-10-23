@@ -220,7 +220,8 @@ def fetch_documents_page(conn, page=0, page_size=20, search_query=None):
                 "WHEN documents.Notes LIKE ? THEN 3 ELSE 4 END, documents.CreationTime DESC "
                 "LIMIT ? OFFSET ?"
             )
-            params = [search_query] + note_like_params + [order_probe, order_probe, order_probe, order_probe, page_size, offset]
+            params = [search_query] + note_like_params + [order_probe, order_probe, order_probe, order_probe, page_size,
+                                                          offset]
             cur.execute(sql, params)
             rows = cur.fetchall()
             count_sql = (
@@ -234,7 +235,8 @@ def fetch_documents_page(conn, page=0, page_size=20, search_query=None):
             # fallback to naive LIKE search
             terms = [t.strip() for t in re.split(r"[;]", search_query) if t.strip()]
             like_fields = [
-                "ArticleTitle", "Authors", "Abstracts", "AuthorKeywords", "KeywordsPlus", "WoSCategories", "ResearchAreas", "SubKeyWords"
+                "ArticleTitle", "Authors", "Abstracts", "AuthorKeywords", "KeywordsPlus", "WoSCategories",
+                "ResearchAreas", "SubKeyWords"
             ]
             q = f"%{search_query}%"
             where = " OR ".join([f"{f} LIKE ?" for f in like_fields])
@@ -255,7 +257,9 @@ def fetch_documents_page(conn, page=0, page_size=20, search_query=None):
             cur.execute(sql, params)
             rows = cur.fetchall()
             count_sql = (
-                "SELECT count(*) FROM documents WHERE " + " OR ".join([f"{f} LIKE ?" for f in like_fields]) + " OR " + (" OR ".join(["Notes LIKE ?" for _ in terms]) if terms else "Notes LIKE ?")
+                    "SELECT count(*) FROM documents WHERE " + " OR ".join(
+                [f"{f} LIKE ?" for f in like_fields]) + " OR " + (
+                        " OR ".join(["Notes LIKE ?" for _ in terms]) if terms else "Notes LIKE ?")
             )
             count_params = [q] * len(like_fields) + ([f"%{t}%" for t in terms] if terms else [q])
             cur.execute(count_sql, count_params)
@@ -851,7 +855,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Table view
         self.table_saved = QtWidgets.QTableWidget(0, 8)
         self.table_saved.setHorizontalHeaderLabels([
-#            "ID", "Index", "ArticleTitle", "Authors", "PublicationYear", "CreationTime", "SubKeyWords", "Notes"])
+            #            "ID", "Index", "ArticleTitle", "Authors", "PublicationYear", "CreationTime", "SubKeyWords", "Notes"])
             "ID", "Index", "ArticleTitle", "Authors", "Year", "CreationTime", "SubKeyWords", "Notes"])
         self.table_saved.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
         self.table_saved.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -872,7 +876,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # preview and notes in a resizable splitter
         self.saved_preview = ZoomableTextEdit()
         self.saved_preview.setReadOnly(True)
-        self.notes_edit = QtWidgets.QTextEdit()
+        self.notes_edit = ZoomableTextEdit()
         saved_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         saved_splitter.addWidget(self.saved_preview)
         saved_splitter.addWidget(self.notes_edit)
@@ -919,7 +923,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 subkw_disp = "; ".join(json.loads(subkw))
             except Exception:
                 subkw_disp = subkw
-            items = [str(rid), ("" if excel_idx is None else str(excel_idx)), art, authors, pyear, ctime, subkw_disp, notes_val or ""]
+            items = [str(rid), ("" if excel_idx is None else str(excel_idx)), art, authors, pyear, ctime, subkw_disp,
+                     notes_val or ""]
             for c, val in enumerate(items):
                 it = QtWidgets.QTableWidgetItem(val)
                 self.table_saved.setItem(r, c, it)
@@ -1012,33 +1017,33 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------------------
     def _setup_tab_analytics(self):
         layout = QtWidgets.QVBoxLayout(self.tab_analytics)
-        
+
         # Controls
         controls = QtWidgets.QHBoxLayout()
         self.keyword_input = QtWidgets.QLineEdit()
         self.keyword_input.setPlaceholderText("Enter keywords to analyze (separated by semicolons)")
         controls.addWidget(QtWidgets.QLabel("Keywords:"))
         controls.addWidget(self.keyword_input)
-        
+
         self.btn_analyze = QtWidgets.QPushButton("Analyze")
         self.btn_analyze.clicked.connect(self.generate_analytics)
         controls.addWidget(self.btn_analyze)
-        
+
         controls.addStretch()
         layout.addLayout(controls)
-        
+
         # Charts area with scrollable widget
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        
+
         self.charts_container = QtWidgets.QWidget()
         self.charts_layout = QtWidgets.QVBoxLayout(self.charts_container)
-        
+
         self.scroll_area.setWidget(self.charts_container)
         layout.addWidget(self.scroll_area)
-        
+
         # Initial empty charts
         self._clear_charts()
 
@@ -1047,7 +1052,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Clear all existing widgets
         for i in reversed(range(self.charts_layout.count())):
             self.charts_layout.itemAt(i).widget().setParent(None)
-        
+
         # Add placeholder
         placeholder = QtWidgets.QLabel("Enter keywords and click Analyze to generate charts")
         placeholder.setAlignment(QtCore.Qt.AlignCenter)
@@ -1060,20 +1065,20 @@ class MainWindow(QtWidgets.QMainWindow):
         if not keywords_text:
             QtWidgets.QMessageBox.information(self, "No keywords", "Please enter keywords to analyze.")
             return
-        
+
         # Split keywords by semicolon
         keywords = [k.strip() for k in keywords_text.split(';') if k.strip()]
         if not keywords:
             QtWidgets.QMessageBox.information(self, "No keywords", "Please enter valid keywords.")
             return
-        
+
         # Clear existing charts
         self._clear_charts()
-        
+
         # Get data from database
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
-        
+
         # Get all documents with their SubKeyWords and Notes and PublicationYear
         cur.execute("""
             SELECT SubKeyWords, Notes, PublicationYear FROM documents 
@@ -1082,7 +1087,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         rows = cur.fetchall()
         conn.close()
-        
+
         # Process data for each keyword separately
         keyword_data = {}
         for keyword in keywords:
@@ -1090,7 +1095,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 'total_count': 0,
                 'yearly_data': {}
             }
-        
+
         for subkw_json, notes, year in rows:
             try:
                 year_str = str(year).strip() if year else "Unknown"
@@ -1105,7 +1110,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     for doc_kw in subkeywords:
                         if k in str(doc_kw).lower():
                             keyword_data[keyword]['total_count'] += 1
-                            keyword_data[keyword]['yearly_data'][year_str] = keyword_data[keyword]['yearly_data'].get(year_str, 0) + 1
+                            keyword_data[keyword]['yearly_data'][year_str] = keyword_data[keyword]['yearly_data'].get(
+                                year_str, 0) + 1
                             counted = True
                             break
                     if counted:
@@ -1113,10 +1119,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     # Notes match (semicolon-separated)
                     if any(k in part.lower() for part in note_parts):
                         keyword_data[keyword]['total_count'] += 1
-                        keyword_data[keyword]['yearly_data'][year_str] = keyword_data[keyword]['yearly_data'].get(year_str, 0) + 1
+                        keyword_data[keyword]['yearly_data'][year_str] = keyword_data[keyword]['yearly_data'].get(
+                            year_str, 0) + 1
             except Exception:
                 continue
-        
+
         # Compose document list of all found papers (dedup by id, match any keyword)
         doc_results = {}
         conn = sqlite3.connect(DB_PATH)
@@ -1190,7 +1197,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ax_pie.set_title('Keyword Distribution\n(All Keywords Combined)')
         else:
             ax_pie.text(0.5, 0.5, 'No data found', ha='center', va='center',
-                       transform=ax_pie.transAxes, fontsize=12)
+                        transform=ax_pie.transAxes, fontsize=12)
             ax_pie.set_title('Keyword Distribution')
         charts_row.addWidget(pie_canvas)
         # Line chart
@@ -1198,14 +1205,21 @@ class MainWindow(QtWidgets.QMainWindow):
         line_canvas = FigureCanvas(line_figure)
         ax_line = line_figure.add_subplot(111)
         has_data = False
+
         for i, (keyword, data) in enumerate(keyword_data.items()):
             if data['yearly_data']:
-                years = [y for y in data['yearly_data'].keys() if y != "Unknown" and y.isdigit()]
-                if years:
-                    sorted_years = sorted(years)
-                    counts = [data['yearly_data'][y] for y in sorted_years]
-                    ax_line.plot(sorted_years, counts, marker='o', linewidth=2,
-                               label=keyword, color=plt.cm.Set3(i))
+                # Convert valid numeric string years to integers for sorting
+                numeric_years = sorted(
+                    [int(y) for y in data['yearly_data'].keys() if y.isdigit()]
+                )
+                if numeric_years:
+                    # Get counts using string keys
+                    counts = [data['yearly_data'][str(y)] for y in numeric_years]
+                    ax_line.plot(
+                        numeric_years, counts,
+                        marker='o', linewidth=2,
+                        label=keyword, color=plt.cm.Set3(i)
+                    )
                     has_data = True
         if has_data:
             ax_line.set_xlabel('Year')
@@ -1216,7 +1230,7 @@ class MainWindow(QtWidgets.QMainWindow):
             plt.setp(ax_line.get_xticklabels(), rotation=45)
         else:
             ax_line.text(0.5, 0.5, 'No yearly data', ha='center', va='center',
-                       transform=ax_line.transAxes, fontsize=12)
+                         transform=ax_line.transAxes, fontsize=12)
             ax_line.set_title('Yearly Trends')
         charts_row.addWidget(line_canvas)
         summary_layout.addLayout(charts_row)
@@ -1225,13 +1239,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Add splitter to layout
         self.charts_layout.addWidget(self.analytics_splitter)
         self.analytics_splitter.setSizes([300, 500])
-        
+
         # Show summary
         total_papers = sum(data['total_count'] for data in keyword_data.values())
         summary_text = f"Analysis Complete!\n\nTotal papers found: {total_papers}\n\n"
         for keyword, data in keyword_data.items():
             summary_text += f"{keyword}: {data['total_count']} papers\n"
-        
+
         QtWidgets.QMessageBox.information(self, "Analysis Complete", summary_text)
 
     def _display_analytics_table(self, doc_list):
@@ -1270,9 +1284,9 @@ class MainWindow(QtWidgets.QMainWindow):
         row = table.currentRow()
         if row < 0 or row >= len(self._analytics_table_docrows):
             return
-        
+
         doc = self._analytics_table_docrows[row]
-        
+
         # Get all relevant search criteria from the selected row
         search_criteria = {
             'ArticleTitle': doc.get('ArticleTitle', ''),
@@ -1284,7 +1298,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # print(doc)
         # Switch to Saved Documents tab
         self.tabs.setCurrentIndex(1)
-        self.input_search.setText( doc.get('ArticleTitle', ''))  # Clear search box
+        self.input_search.setText(doc.get('ArticleTitle', ''))  # Clear search box
         self.refresh_saved_tab(search_query=self.input_search.text().strip(), page=0)
         self.on_saved_double_click(0, 0)  # Show first row preview
         # def find_and_select_matching_row():
@@ -1297,34 +1311,33 @@ class MainWindow(QtWidgets.QMainWindow):
         #         'SubKeyWords': 6,
         #         'Notes': 7
         #     }
-            
+
         #     # Search through all rows in saved documents table
         #     for i in range(table_saved.rowCount()):
         #         matches = 0
         #         total_criteria = 0
-                
+
         #         for field, search_value in search_criteria.items():
         #             if not search_value:  # Skip empty criteria
         #                 continue
-                        
+
         #             total_criteria += 1
         #             col_idx = col_indices.get(field)
         #             if col_idx is None:
         #                 continue
-                        
+
         #             cell_item = table_saved.item(i, col_idx)
         #             if cell_item and search_value in cell_item.text():
         #                 matches += 1
-                
+
         #         # If most criteria match (allow for some differences due to formatting)
         #         if total_criteria > 0 and matches / total_criteria > 0.5:
         #             table_saved.selectRow(i)
         #             self.on_saved_double_click(i, 0)
         #             break
-        
+
         # Give UI time to update, then search and select
         # QtCore.QTimer.singleShot(150, find_and_select_matching_row)
-
 
 
 # ---------------------------
