@@ -1025,6 +1025,20 @@ class MainWindow(QtWidgets.QMainWindow):
         controls.addWidget(QtWidgets.QLabel("Keywords:"))
         controls.addWidget(self.keyword_input)
 
+        # Add database index range controls
+        self.db_index_start = QtWidgets.QLineEdit()
+        self.db_index_start.setValidator(QtGui.QIntValidator(0, 1000000, self))
+        self.db_index_start.setFixedWidth(80)
+        self.db_index_start.setPlaceholderText("Start DB idx")
+        controls.addWidget(QtWidgets.QLabel("DB Start:"))
+        controls.addWidget(self.db_index_start)
+        self.db_index_end = QtWidgets.QLineEdit()
+        self.db_index_end.setValidator(QtGui.QIntValidator(0, 1000000, self))
+        self.db_index_end.setFixedWidth(80)
+        self.db_index_end.setPlaceholderText("End DB idx")
+        controls.addWidget(QtWidgets.QLabel("DB End:"))
+        controls.addWidget(self.db_index_end)
+
         self.btn_analyze = QtWidgets.QPushButton("Analyze")
         self.btn_analyze.clicked.connect(self.generate_analytics)
         controls.addWidget(self.btn_analyze)
@@ -1125,15 +1139,35 @@ class MainWindow(QtWidgets.QMainWindow):
                 continue
 
         # Compose document list of all found papers (dedup by id, match any keyword)
-        doc_results = {}
+        doc_list = []
+        try:
+            id_start = self.db_index_start.text()
+            id_end = self.db_index_end.text()
+            id_start = int(id_start) if id_start.strip() else None
+            id_end = int(id_end) if id_end.strip() else None
+        except Exception:
+            id_start, id_end = None, None
+
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
-        # Query all doc fields for matching
-        cur.execute("SELECT id, ExcelIndex, ArticleTitle, Authors, PublicationYear, SubKeyWords, Notes FROM documents")
+        # Compose query for DB id bounds
+        sql_base = "SELECT id, ExcelIndex, ArticleTitle, Authors, PublicationYear, SubKeyWords, Notes FROM documents"
+        if id_start is not None and id_end is not None:
+            sql = sql_base + " WHERE id >= ? AND id < ?"
+            params = (id_start, id_end)
+        elif id_start is not None:
+            sql = sql_base + " WHERE id >= ?"
+            params = (id_start,)
+        elif id_end is not None:
+            sql = sql_base + " WHERE id < ?"
+            params = (id_end,)
+        else:
+            sql = sql_base
+            params = ()
+        cur.execute(sql, params)
         all_docs = cur.fetchall()
         for row in all_docs:
             docid, excel_idx, art, authors, pyear, subkw_json, notes = row
-            # Prepare fields (avoid errors)
             try:
                 subkw_list = json.loads(subkw_json) if subkw_json else []
             except:
@@ -1147,16 +1181,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 elif any(k in part.lower() for part in note_parts):
                     matched = True
             if matched:
-                doc_results[docid] = {
+                doc_list.append({
                     'ExcelIndex': excel_idx,
                     'ArticleTitle': art,
                     'Authors': authors,
                     'PublicationYear': pyear,
                     'SubKeyWords': subkw_list,
                     'Notes': notes or ''
-                }
+                })
         conn.close()
-        doc_list = list(doc_results.values())
+
         # Clear analytics UI and create a new splitter to prevent stale widgets
         while self.charts_layout.count() > 0:
             item = self.charts_layout.takeAt(0)
@@ -1240,9 +1274,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.charts_layout.addWidget(self.analytics_splitter)
         self.analytics_splitter.setSizes([300, 500])
 
-        # Show summary
+        # Show summary (use doc_list & keyword_data only)
         total_papers = sum(data['total_count'] for data in keyword_data.values())
-        summary_text = f"Analysis Complete!\n\nTotal papers found: {total_papers}\n\n"
+        summary_text = f"Analysis Complete!\n\nTotal papers found: {len(doc_list)}\n\n"
         for keyword, data in keyword_data.items():
             summary_text += f"{keyword}: {data['total_count']} papers\n"
 
