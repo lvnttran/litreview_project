@@ -889,6 +889,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_save_note.clicked.connect(self.on_save_note_clicked)
         notes_btn_row.addStretch(1)
         notes_btn_row.addWidget(self.btn_save_note)
+        # Add Delete button to notes_btn_row below self.btn_save_note
+        self.btn_delete_doc = QtWidgets.QPushButton("Delete Paper")
+        self.btn_delete_doc.clicked.connect(self.on_delete_doc_clicked)
+        notes_btn_row.addWidget(self.btn_delete_doc)
         layout.addLayout(notes_btn_row)
 
         # internal paging state
@@ -1011,6 +1015,30 @@ class MainWindow(QtWidgets.QMainWindow):
         if rows:
             self.on_saved_double_click(rows[0].row(), 0)
         QtWidgets.QMessageBox.information(self, "Saved", "Note saved.")
+
+    def on_delete_doc_clicked(self):
+        selected = self.table_saved.currentRow()
+        if selected < 0:
+            QtWidgets.QMessageBox.warning(self, "No selection", "Please select a row in the table to delete.")
+            return
+        id_item = self.table_saved.item(selected, 0)  # Col 0 is ID
+        if not id_item:
+            QtWidgets.QMessageBox.warning(self, "No selection", "Could not determine the selected document's ID.")
+            return
+        doc_id = id_item.text()
+        reply = QtWidgets.QMessageBox.question(self, "Delete Paper", f"Are you sure you want to permanently delete document ID {doc_id}?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            cur.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+            conn.commit()
+            conn.close()
+            # If using FTS or other indexes, may need to update there as well
+            self.refresh_saved_tab()
+            self.saved_preview.clear()
+            self.notes_edit.clear()
+            self.selected_saved_doc_id = None
+            QtWidgets.QMessageBox.information(self, "Deleted", f"Document ID {doc_id} has been deleted.")
 
     # ---------------------------
     # Tab 3: Analytics
