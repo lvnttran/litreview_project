@@ -67,7 +67,7 @@ WORD_RE = re.compile(r"[A-Za-z0-9'\-]+")  # includes words with apostrophes or d
 
 # --- User-editable recommended tag dictionary for Notes ---
 RECOMMENDED_TAGS = {
-    "Type": ["product_config;", "process_configuration;", "product_process_config"],
+    "Type": ["product_config;", "process_configuration;", "product_process_config", "not_relevant;"],
     "Motiv": [""],
     "AI tech": ["_cbr;", "_dt;", "_owl;", "_swlr;"],
     "Optimization": ["_ga;"],
