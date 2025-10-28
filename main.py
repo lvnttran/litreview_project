@@ -65,6 +65,19 @@ ENGLISH_STOPWORDS = {
 # Simple tokenizer
 WORD_RE = re.compile(r"[A-Za-z0-9'\-]+")  # includes words with apostrophes or dashes
 
+# --- User-editable recommended tag dictionary for Notes ---
+RECOMMENDED_TAGS = {
+    "Type": ["product_config;", "process_configuration;", "product_process_config"],
+    "Motiv": [""],
+    "AI tech": ["_cbr;", "_dt;", "_owl;", "_swlr;"],
+    "Optimization": ["_ga;"],
+    "System Eng": [""],
+    "KPI": ["_cost;", "_time;"],
+    "Use case": ["_yes; detail;", "_no;"],
+    "Data": ["_real;", "_simulated;"],
+    "Context": ["_eto;", "_cto/mass/ato;"],
+    "Futur": [""],
+}
 
 # ---------------------------
 # Database utilities
@@ -901,6 +914,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.total_docs = 0
         self.selected_saved_doc_id = None
 
+      # Add tag suggestion scroll area
+        self.notes_tag_suggestion_widget = QtWidgets.QWidget()
+        self.notes_tag_layout = QtWidgets.QHBoxLayout(self.notes_tag_suggestion_widget)
+        self.notes_tag_layout.setContentsMargins(0, 0, 0, 0)
+        self.notes_tag_layout.setSpacing(5)
+
+        # Wrap in scroll area
+        self.notes_tag_scroll = QtWidgets.QScrollArea()
+        self.notes_tag_scroll.setWidgetResizable(True)
+        self.notes_tag_scroll.setWidget(self.notes_tag_suggestion_widget)
+        self.notes_tag_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.notes_tag_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+
+        layout.addWidget(self.notes_tag_scroll)
+        self.notes_tag_scroll.hide()
+
         # initial load
         self.refresh_saved_tab()
 
@@ -998,6 +1027,56 @@ class MainWindow(QtWidgets.QMainWindow):
         self.saved_preview.setHtml("".join(html_parts))
         # populate notes editor
         self.notes_edit.setText(notes or "")
+        # Show tag suggestions
+        self.update_notes_tag_suggestions()
+
+    def update_notes_tag_suggestions(self):
+        """Show tag suggestions below notes_edit using RECOMMENDED_TAGS dict, grouped by category."""
+        layout = self.notes_tag_layout
+        # Remove widgets from layout
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        any_tags = False
+        for group, taglist in RECOMMENDED_TAGS.items():
+            if not taglist:
+                continue
+            any_tags = True
+            cat_label = QtWidgets.QLabel(str(group)+":")
+            cat_label.setStyleSheet('font-weight: bold; padding:1px 4px;')
+            layout.addWidget(cat_label)
+            for tag in taglist:
+                btn = QtWidgets.QPushButton(tag)
+                btn.setStyleSheet('padding:2px 6px; font-size: 12px;')
+                btn.clicked.connect(lambda _, t=tag: self.insert_tag_into_notes(t))
+                layout.addWidget(btn)
+        layout.addStretch(1)
+        if any_tags:
+            self.notes_tag_scroll.show()
+        else:
+            self.notes_tag_scroll.hide()
+
+    def insert_tag_into_notes(self, tag):
+        """Append tag to notes (add '; ' if needed) at cursor pos, avoid duplicate."""
+        edit = self.notes_edit
+        text = edit.toPlainText().rstrip()
+        tags = [t.strip() for t in text.split(';') if t.strip()]
+        if tag in tags:
+            # Don't add duplicate
+            return
+        if text == "":
+            new_text = tag
+        elif text.endswith(';') or text.endswith('; '):
+            new_text = text + tag
+        else:
+            new_text = text + '; ' + tag
+        edit.setText(new_text)
+        edit.setFocus()
+        # Optionally, move cursor to end
+        cursor = edit.textCursor()
+        cursor.movePosition(cursor.End)
+        edit.setTextCursor(cursor)
 
     def on_save_note_clicked(self):
         if not self.selected_saved_doc_id:
